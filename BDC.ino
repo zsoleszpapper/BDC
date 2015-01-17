@@ -1,4 +1,5 @@
 #include <EEPROM.h>
+#include <DS1307new.h>
 #include "EtherShield.h"
 
 static uint8_t mymac[6] = {
@@ -35,6 +36,8 @@ const prog_char HTTP401UNAUTHORIZED[] PROGMEM = "HTTP/1.0 401 Unauthorized\r\nCo
 const prog_char HTML_HEADER_GENERAL[] PROGMEM = "<html><head><title>Big Display Clock</title></head><body><center><h1>Big Display Clock</h1><br>";
 const prog_char HTML_FOOTER_GENERAL[] PROGMEM = "</center><hr></body></html>";
     
+uint8_t current_hour = 0;
+uint8_t current_min = 0;
 
 // The ethernet shield
 EtherShield es=EtherShield();
@@ -58,6 +61,9 @@ void setup(){
   Serial.begin(9600);
   
   get_alarm_eeprom();
+
+  RTC.startClock();
+
 }
 
 #define EEPROM_ALARM_OFFSET 0
@@ -221,6 +227,47 @@ void web_loop() {
   es.ES_www_server_reply(buf,plen);
 }
 
+void play_sound(uint8_t id) {
+#ifdef DBG
+  char soundname[20];
+  strcpy_P(soundname, (char*)pgm_read_word(&(sound_name_table[id])));
+  Serial.print("Play "); Serial.println(soundname);
+#endif
+  // TODO
+}
+
+void play_sound_if_needed() {
+  for (uint8_t i=0; i<ALARMZ_SIZE; i++) {
+    if ((hourz[i] == current_hour) && (minutez[i] == current_min)) {
+      play_sound(soundz[i]);
+      return;
+    }
+  }
+}
+
+void update_big_display(uint8_t hour, uint8_t min) {
+  // TODO
+}
+
+void time_loop() {
+  RTC.getTime();
+#ifdef DBG
+  //Serial.print(RTC.year); Serial.print("/"); Serial.print(RTC.month); Serial.print("/"); Serial.print(RTC.day); Serial.print(" ");
+#endif
+  if ((current_hour != RTC.hour) || (current_min != RTC.minute)) {
+#ifdef DBG
+    Serial.print("TIMESTEP ");
+    Serial.print(RTC.hour); Serial.print(":"); Serial.print(RTC.minute); Serial.print(":"); Serial.print(RTC.second); Serial.println();
+#endif
+    current_hour = RTC.hour;
+    current_min = RTC.minute;
+    update_big_display(current_hour, current_min);
+    play_sound_if_needed();
+  }
+}
+
 void loop(){
   web_loop();
+  time_loop();
+  delay(50);
 }

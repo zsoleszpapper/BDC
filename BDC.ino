@@ -83,6 +83,49 @@ void get_alarm_eeprom() {
   }
 }
 
+uint16_t webpages_job_setclock(char *params, uint8_t *buf) {
+  char* paramstart;
+  if ((paramstart = strstr(params,"?")) != 0) {
+    char kvalstrbuf[16];
+    if (es.ES_find_key_val(paramstart,kvalstrbuf,16,"SET")) {
+      RTC.stopClock();
+      if (es.ES_find_key_val(paramstart,kvalstrbuf,16,"Y")) { RTC.year = strtoul(kvalstrbuf, (char**)0, 10); }
+      if (es.ES_find_key_val(paramstart,kvalstrbuf,16,"MO")) { RTC.month = strtoul(kvalstrbuf, (char**)0, 10); }
+      if (es.ES_find_key_val(paramstart,kvalstrbuf,16,"D")) { RTC.day = strtoul(kvalstrbuf, (char**)0, 10); }
+      if (es.ES_find_key_val(paramstart,kvalstrbuf,16,"H")) { RTC.hour = strtoul(kvalstrbuf, (char**)0, 10); }
+      if (es.ES_find_key_val(paramstart,kvalstrbuf,16,"MI")) { RTC.minute = strtoul(kvalstrbuf, (char**)0, 10); }
+      RTC.second = 0;
+      RTC.setTime();
+      RTC.startClock();
+    }
+  }
+  char value[16];
+  uint16_t plen;
+  plen=es.ES_fill_tcp_data_p(buf,0,HTTP200OK);
+  plen=es.ES_fill_tcp_data_p(buf,plen,HTML_HEADER_GENERAL);
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<h3>Set clock</h3><br>"));
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<form method=GET>"));
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=text size=4 name='Y' value='"));
+  sprintf(value,"%d",RTC.year); plen=es.ES_fill_tcp_data(buf,plen,value);
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("'>/"));
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=text size=2 name='MO' value='"));
+  sprintf(value,"%02d",RTC.month); plen=es.ES_fill_tcp_data(buf,plen,value);
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("'>/"));
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=text size=2 name='D' value='"));
+  sprintf(value,"%02d",RTC.day); plen=es.ES_fill_tcp_data(buf,plen,value);
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("'><br>"));
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=text size=2 name='H' value='"));
+  sprintf(value,"%02d",RTC.hour); plen=es.ES_fill_tcp_data(buf,plen,value);
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("'>:"));
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=text size=2 name='MI' value='"));
+  sprintf(value,"%02d",RTC.minute); plen=es.ES_fill_tcp_data(buf,plen,value);
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("'><br>"));
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=submit name=SET value=Ok></form>"));
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<a href='/'>Main</a>"));
+  plen=es.ES_fill_tcp_data_p(buf,plen,HTML_FOOTER_GENERAL);
+  return plen;
+}
+
 uint16_t webpages_job_clocks(char *params, uint8_t *buf) {
   char* paramstart;
   uint8_t clockno = 0;
@@ -179,6 +222,7 @@ uint16_t webpages_job_main(char *params, uint8_t *buf) {
     sprintf(value,"%d:%d - %s<br>",hourz[i],minutez[i],soundname);
     plen=es.ES_fill_tcp_data(buf,plen,value);
   }
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<br><br><a href='/setclock'>Set clock</a>"));
   plen=es.ES_fill_tcp_data_p(buf,plen,HTML_FOOTER_GENERAL);
   return plen;
 }
@@ -197,6 +241,8 @@ uint16_t webpages_job(char *params, uint8_t *buf) {
      return webpages_job_main(params, buf);
   } else if (webpage_name(params,"clocks")) {
      return webpages_job_clocks(params, buf);
+  } else if (webpage_name(params,"setclock")) {
+     return webpages_job_setclock(params, buf);
   } else {
      return es.ES_fill_tcp_data_p(buf,0,HTTP401UNAUTHORIZED);
   }

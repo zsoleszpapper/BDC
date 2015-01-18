@@ -175,15 +175,12 @@ uint16_t webpages_job_clocks(char *params, uint8_t *buf) {
     plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("Set OK"));
   }
   plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<br>"));
-  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("Alarm No."));
-  sprintf(value,"%d",clockno); plen=es.ES_fill_tcp_data(buf,plen,value);
-  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR(":"));
   plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<form method=GET>"));
   plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=text size=2 name='H' value='"));
-  sprintf(value,"%d",hourz[clockno]); plen=es.ES_fill_tcp_data(buf,plen,value);
+  sprintf(value,"%02d",hourz[clockno]); plen=es.ES_fill_tcp_data(buf,plen,value);
   plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("'>:"));
   plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=text size=2 name='M' value='"));
-  sprintf(value,"%d",minutez[clockno]); plen=es.ES_fill_tcp_data(buf,plen,value);
+  sprintf(value,"%02d",minutez[clockno]); plen=es.ES_fill_tcp_data(buf,plen,value);
   plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("'><br>"));
   plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<select name=S size=1>"));
   for (uint8_t i=0; i<NUM_OF_SOUNDZ; i++) {
@@ -212,26 +209,26 @@ uint16_t webpages_job_main(char *params, uint8_t *buf) {
   uint16_t plen;
   plen=es.ES_fill_tcp_data_p(buf,0,HTTP200OK);
   plen=es.ES_fill_tcp_data_p(buf,plen,HTML_HEADER_GENERAL);
-  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<h3>Main page</h3><br>"));
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<h3>Main page</h3><br><table>"));
   for (uint8_t i=0; i<ALARMZ_SIZE; i++) {
     char soundname[20];
     strcpy_P(soundname, (char*)pgm_read_word(&(sound_name_table[soundz[i]])));
     char value[80];
-    sprintf(value,"<a href='/clocks?C=%d'>Alarm %d</a>: ",i,i);
+    sprintf_P(value,PSTR("<tr><td><a href='/clocks?C=%d'>%d: "),i,i+1);
     plen=es.ES_fill_tcp_data(buf,plen,value);
-    sprintf(value,"%d:%d - %s<br>",hourz[i],minutez[i],soundname);
+    sprintf_P(value,PSTR("%02d:%02d</a></td><td>%s</td></tr>"),hourz[i],minutez[i],soundname);
     plen=es.ES_fill_tcp_data(buf,plen,value);
   }
-  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<br><br><a href='/setclock'>Set clock</a>"));
+  plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("</table><br><br><a href='/setclock'>Set clock</a>"));
   plen=es.ES_fill_tcp_data_p(buf,plen,HTML_FOOTER_GENERAL);
   return plen;
 }
 
 bool webpage_name(char *params, char *pagename) {
   char compare[16];
-  sprintf(compare,"/%s ",pagename);
+  sprintf_P(compare,PSTR("/%s "),pagename);
   if (strncmp(compare,params,strlen(pagename)+2)==0) { return true; }
-  sprintf(compare,"/%s?",pagename);
+  sprintf_P(compare,PSTR("/%s?"),pagename);
   if (strncmp(compare,params,strlen(pagename)+2)==0) { return true; }
   return false;
 }
@@ -297,9 +294,6 @@ void update_big_display(uint8_t hour, uint8_t min) {
 
 void time_loop() {
   RTC.getTime();
-#ifdef DBG
-  //Serial.print(RTC.year); Serial.print("/"); Serial.print(RTC.month); Serial.print("/"); Serial.print(RTC.day); Serial.print(" ");
-#endif
   if ((current_hour != RTC.hour) || (current_min != RTC.minute)) {
 #ifdef DBG
     Serial.print("TIMESTEP ");
@@ -315,5 +309,4 @@ void time_loop() {
 void loop(){
   web_loop();
   time_loop();
-  delay(50);
 }

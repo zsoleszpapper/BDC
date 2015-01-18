@@ -2,16 +2,13 @@
 #include <DS1307new.h>
 #include "EtherShield.h"
 
-static uint8_t mymac[6] = {
-  0x54,0x55,0x58,0x10,0x00,0x25}; 
-  
-static uint8_t myip[4] = {
-  192,168,25,83};
 
 #define DBG
 
 #define MYWWWPORT 8080
 #define WEB_BUFFER_SIZE 1000
+static uint8_t network_mac[6];
+static uint8_t network_ip[4];
 
 #define ALARMZ_SIZE 8
 static uint8_t hourz[ALARMZ_SIZE];
@@ -49,24 +46,103 @@ int freeRam() {
 }
 
 void setup(){
+  Serial.begin(9600);
+
+  get_alarm_eeprom();
+  get_network_eeprom();
+#ifdef DBG
+  print_config(network_mac, network_ip);
+#endif
   // Initialise SPI interface
   es.ES_enc28j60SpiInit();
 
   // initialize enc28j60
-  es.ES_enc28j60Init(mymac);
+  es.ES_enc28j60Init(network_mac);
 
   // init the ethernet/ip layer:
-  es.ES_init_ip_arp_udp_tcp(mymac,myip, MYWWWPORT);
+  es.ES_init_ip_arp_udp_tcp(network_mac, network_ip, MYWWWPORT);
   
-  Serial.begin(9600);
-  
-  get_alarm_eeprom();
-
   RTC.startClock();
 
 }
 
-#define EEPROM_ALARM_OFFSET 0
+#ifdef DBG
+void print_config(uint8_t *mac, uint8_t *ip) {
+  char temp[30];
+  sprintf_P(temp,PSTR("MAC %02X:%02X:%02X:%02X:%02X:%02X"), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  Serial.println(temp);
+  sprintf_P(temp,PSTR("IP  %u.%u.%u.%u"), ip[0], ip[1], ip[2], ip[3]);
+  Serial.println(temp);
+}
+#endif
+
+#define EEPROM_NETWORK_OFFSET 0
+
+boolean calc_network_checksum(uint8_t *mac, uint8_t *ip, uint8_t *sum) {
+  uint8_t magic = 0xAA;
+  uint8_t imagic;
+  for (uint8_t i=0; i<6; i++) {
+    magic ^= mac[i];
+    magic += i;
+  }
+  for (uint8_t i=0; i<4; i++) {
+    magic ^= ip[i];
+    magic += i;
+  }
+  imagic = (~magic)&0xFF;
+  if ((sum[0] == magic) && (sum[1] == imagic)) {
+    return true;
+  } else {
+    sum[0] = magic;
+    sum[1] = imagic;
+    return false;
+  }
+}
+
+void set_network_eeprom(uint8_t *mac, uint8_t *ip) {
+  uint8_t cs[2];
+  calc_network_checksum(mac, ip, cs);
+  int base_addr;
+  base_addr = EEPROM_NETWORK_OFFSET;
+  for (uint8_t i=0; i<6; i++) {
+    EEPROM.write(base_addr + i, mac[i]);
+  }
+  base_addr = EEPROM_NETWORK_OFFSET + 6;
+  for (uint8_t i=0; i<4; i++) {
+    EEPROM.write(base_addr + i, ip[i]);
+  }
+  base_addr = EEPROM_NETWORK_OFFSET + 10;
+  for (uint8_t i=0; i<2; i++) {
+    EEPROM.write(base_addr + i, cs[i]);
+  }
+}
+
+void get_network_eeprom() {
+  uint8_t network_mac_default[6] = { 0x72,0x3C,0x39,0x00,0x18,0x00 };
+  uint8_t network_ip_default[4] = { 192,168,25,83 };
+  uint8_t network_checksum[2];
+  int base_addr;
+  base_addr = EEPROM_NETWORK_OFFSET;
+  for (uint8_t i=0; i<6; i++) {
+    network_mac[i] = EEPROM.read(base_addr + i);
+  }
+  base_addr = EEPROM_NETWORK_OFFSET + 6;
+  for (uint8_t i=0; i<4; i++) {
+    network_ip[i] = EEPROM.read(base_addr + i);
+  }
+  base_addr = EEPROM_NETWORK_OFFSET + 10;
+  for (uint8_t i=0; i<2; i++) {
+    network_checksum[i] = EEPROM.read(base_addr + i);
+  }
+  if (calc_network_checksum(network_mac, network_ip, network_checksum) == false) {
+    memcpy(network_mac, network_mac_default, 6);
+    memcpy(network_ip, network_ip_default, 4);
+    set_network_eeprom(network_mac, network_ip);
+  }
+
+}
+
+#define EEPROM_ALARM_OFFSET 12
 void set_alarm_eeprom(uint8_t clockno, uint8_t hour, uint8_t min, uint8_t sound) {
   int base_addr = EEPROM_ALARM_OFFSET + clockno*3;
   EEPROM.write(base_addr + 0, hour);

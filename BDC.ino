@@ -27,6 +27,8 @@ const char * const sound_name_table[] PROGMEM = {
   sound_name_3,
 };
 
+#define BUZZER 3
+
 const prog_char HTTP200OK[] PROGMEM = "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nPragma: no-cache\r\n\r\n";
 const prog_char HTTP401UNAUTHORIZED[] PROGMEM = "HTTP/1.0 401 Unauthorized\r\nContent-Type: text/html\r\n\r\n<h1>401 Unauthorized</h1>";
 
@@ -352,7 +354,18 @@ void play_sound(uint8_t id) {
   strcpy_P(soundname, (char*)pgm_read_word(&(sound_name_table[id])));
   Serial.print("Play "); Serial.println(soundname);
 #endif
-  // TODO
+  tone(BUZZER, 440);
+  delay(200);
+  noTone(BUZZER);
+  delay(200);
+  tone(BUZZER, 440);
+  delay(200);
+  noTone(BUZZER);
+  delay(200);
+  tone(BUZZER, 440);
+  delay(200);
+  noTone(BUZZER);
+  digitalWrite(BUZZER, LOW);
 }
 
 void play_sound_if_needed() {

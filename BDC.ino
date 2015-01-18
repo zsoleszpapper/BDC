@@ -281,7 +281,7 @@ void play_sound(uint8_t id) {
 
 void play_sound_if_needed() {
   for (uint8_t i=0; i<ALARMZ_SIZE; i++) {
-    if ((hourz[i] == current_hour) && (minutez[i] == current_min)) {
+    if ((soundz[i] != 0) && (hourz[i] == current_hour) && (minutez[i] == current_min)) {
       play_sound(soundz[i]);
       return;
     }

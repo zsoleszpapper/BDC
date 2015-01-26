@@ -5,6 +5,7 @@
 
 
 #define DBG
+#define DBGLED 4
 
 #define MYWWWPORT 8080
 #define WEB_BUFFER_SIZE 1000
@@ -50,6 +51,10 @@ int freeRam() {
 
 void setup(){
   wdt_enable(WDTO_8S);
+
+#ifdef DBGLED
+  pinMode(DBGLED, OUTPUT);
+#endif
 
   Serial.begin(9600);
 
@@ -386,6 +391,13 @@ void update_big_display(uint8_t hour, uint8_t min) {
 
 void time_loop() {
   RTC.getTime();
+#ifdef DBGLED
+  if (RTC.second % 2) {
+    digitalWrite(DBGLED, HIGH);
+  } else {
+    digitalWrite(DBGLED, LOW);
+  }
+#endif
   if ((current_hour != RTC.hour) || (current_min != RTC.minute)) {
 #ifdef DBG
     Serial.print("TIMESTEP ");

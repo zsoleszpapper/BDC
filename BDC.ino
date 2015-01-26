@@ -1,5 +1,6 @@
 #include <EEPROM.h>
 #include <DS1307new.h>
+#include <avr/wdt.h>
 #include "EtherShield.h"
 
 
@@ -48,6 +49,8 @@ int freeRam() {
 }
 
 void setup(){
+  wdt_enable(WDTO_8S);
+
   Serial.begin(9600);
 
   get_alarm_eeprom();
@@ -355,15 +358,15 @@ void play_sound(uint8_t id) {
   Serial.print("Play "); Serial.println(soundname);
 #endif
   tone(BUZZER, 440);
-  delay(200);
+  delay(200); wdt_reset();
   noTone(BUZZER);
-  delay(200);
+  delay(200); wdt_reset();
   tone(BUZZER, 440);
-  delay(200);
+  delay(200); wdt_reset();
   noTone(BUZZER);
-  delay(200);
+  delay(200); wdt_reset();
   tone(BUZZER, 440);
-  delay(200);
+  delay(200); wdt_reset();
   noTone(BUZZER);
   digitalWrite(BUZZER, LOW);
 }
@@ -396,6 +399,7 @@ void time_loop() {
 }
 
 void loop(){
+  wdt_reset();
   web_loop();
   time_loop();
 }

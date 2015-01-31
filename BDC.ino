@@ -7,7 +7,7 @@
 #define DBG
 #define DBGLED 4
 
-#define MYWWWPORT 8080
+#define MYWWWPORT 80
 #define WEB_BUFFER_SIZE 1000
 static uint8_t network_mac[6];
 static uint8_t network_ip[4];
@@ -30,6 +30,7 @@ const char * const sound_name_table[] PROGMEM = {
 };
 
 #define BUZZER 3
+#define RESETBUTTON 5
 
 const prog_char HTTP200OK[] PROGMEM = "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nPragma: no-cache\r\n\r\n";
 const prog_char HTTP401UNAUTHORIZED[] PROGMEM = "HTTP/1.0 401 Unauthorized\r\nContent-Type: text/html\r\n\r\n<h1>401 Unauthorized</h1>";
@@ -56,10 +57,20 @@ void setup(){
   pinMode(DBGLED, OUTPUT);
 #endif
 
+  pinMode(RESETBUTTON, INPUT_PULLUP);
+
   Serial.begin(9600);
 
+  if (digitalRead(RESETBUTTON) == LOW) {
+    reset_network_eeprom();
+    reset_alarm_eeprom();
+  }
+
   get_alarm_eeprom();
-  get_network_eeprom();
+  if (!get_network_eeprom()) {
+    reset_network_eeprom();
+    get_network_eeprom();
+  }
 #ifdef DBG
   print_config(network_mac, network_ip);
 #endif
@@ -127,9 +138,13 @@ void set_network_eeprom(uint8_t *mac, uint8_t *ip) {
   }
 }
 
-void get_network_eeprom() {
+void reset_network_eeprom() {
   uint8_t network_mac_default[6] = { 0x72,0x3C,0x39,0x00,0x18,0x00 };
-  uint8_t network_ip_default[4] = { 192,168,25,83 };
+  uint8_t network_ip_default[4] = { 192,168,0,1 };
+  set_network_eeprom(network_mac_default, network_ip_default);
+}
+
+boolean get_network_eeprom() {
   uint8_t network_checksum[2];
   int base_addr;
   base_addr = EEPROM_NETWORK_OFFSET;
@@ -144,12 +159,7 @@ void get_network_eeprom() {
   for (uint8_t i=0; i<2; i++) {
     network_checksum[i] = EEPROM.read(base_addr + i);
   }
-  if (calc_network_checksum(network_mac, network_ip, network_checksum) == false) {
-    memcpy(network_mac, network_mac_default, 6);
-    memcpy(network_ip, network_ip_default, 4);
-    set_network_eeprom(network_mac, network_ip);
-  }
-
+  return calc_network_checksum(network_mac, network_ip, network_checksum);
 }
 
 #define EEPROM_ALARM_OFFSET 12
@@ -166,6 +176,15 @@ void get_alarm_eeprom() {
     hourz[i] = EEPROM.read(base_addr + 0) % 24;
     minutez[i] = EEPROM.read(base_addr + 1) % 60;
     soundz[i] = EEPROM.read(base_addr + 2) % NUM_OF_SOUNDZ;
+  }
+}
+
+void reset_alarm_eeprom() {
+  for (uint8_t i=0; i<ALARMZ_SIZE; i++) {
+     int base_addr = EEPROM_ALARM_OFFSET + i*3;
+     EEPROM.write(base_addr + 0, 0);
+     EEPROM.write(base_addr + 1, 0);
+     EEPROM.write(base_addr + 2, 0);
   }
 }
 

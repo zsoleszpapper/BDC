@@ -40,9 +40,12 @@ const prog_char HTML_FOOTER_GENERAL[] PROGMEM = "</center><hr></body></html>";
     
 uint8_t current_hour = 0;
 uint8_t current_min = 0;
+uint8_t do_reboot = 0;
 
 // The ethernet shield
 EtherShield es=EtherShield();
+
+void(* resetFunc) (void) = 0;//declare reset function at address 0
 
 int freeRam() {
   extern int __heap_start, *__brkval; 
@@ -186,6 +189,48 @@ void reset_alarm_eeprom() {
      EEPROM.write(base_addr + 1, 0);
      EEPROM.write(base_addr + 2, 0);
   }
+}
+
+uint16_t webpages_job_setip(char *params, uint8_t *buf) {
+  char* paramstart;
+  if ((paramstart = strstr(params,"?")) != 0) {
+    char kvalstrbuf[16];
+    if (es.ES_find_key_val(paramstart,kvalstrbuf,16,"SET")) {
+      uint8_t newip[4];
+      if (es.ES_find_key_val(paramstart,kvalstrbuf,16,"I1")) { newip[0] = strtoul(kvalstrbuf, (char**)0, 10) % 256; }
+      if (es.ES_find_key_val(paramstart,kvalstrbuf,16,"I2")) { newip[1] = strtoul(kvalstrbuf, (char**)0, 10) % 256; }
+      if (es.ES_find_key_val(paramstart,kvalstrbuf,16,"I3")) { newip[2] = strtoul(kvalstrbuf, (char**)0, 10) % 256; }
+      if (es.ES_find_key_val(paramstart,kvalstrbuf,16,"I4")) { newip[3] = strtoul(kvalstrbuf, (char**)0, 10) % 256; }
+      set_network_eeprom(network_mac, newip);
+      do_reboot = 1;
+    }
+  }
+  char value[16];
+  uint16_t plen;
+  plen=es.ES_fill_tcp_data_p(buf,0,HTTP200OK);
+  plen=es.ES_fill_tcp_data_p(buf,plen,HTML_HEADER_GENERAL);
+  if (!do_reboot) {
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<h3>Set IP</h3><br>"));
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<form method=GET>"));
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=text size=3 name='I1' value='"));
+    sprintf(value,"%d",network_ip[0]); plen=es.ES_fill_tcp_data(buf,plen,value);
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("'>."));
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=text size=3 name='I2' value='"));
+    sprintf(value,"%02d",network_ip[1]); plen=es.ES_fill_tcp_data(buf,plen,value);
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("'>."));
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=text size=3 name='I3' value='"));
+    sprintf(value,"%02d",network_ip[2]); plen=es.ES_fill_tcp_data(buf,plen,value);
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("'>."));
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=text size=3 name='I4' value='"));
+    sprintf(value,"%02d",network_ip[3]); plen=es.ES_fill_tcp_data(buf,plen,value);
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("'>"));
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<input type=submit name=SET value=Ok></form>"));
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("<a href='/'>Main</a>"));
+  } else {
+    plen=es.ES_fill_tcp_data_p(buf,plen,PSTR("IP set done, rebooting..."));
+  }
+  plen=es.ES_fill_tcp_data_p(buf,plen,HTML_FOOTER_GENERAL);
+  return plen;
 }
 
 uint16_t webpages_job_setclock(char *params, uint8_t *buf) {
@@ -345,6 +390,8 @@ uint16_t webpages_job(char *params, uint8_t *buf) {
      return webpages_job_clocks(params, buf);
   } else if (webpage_name(params,"setclock")) {
      return webpages_job_setclock(params, buf);
+  } else if (webpage_name(params,"setip")) {
+     return webpages_job_setip(params, buf);
   } else {
      return es.ES_fill_tcp_data_p(buf,0,HTTP401UNAUTHORIZED);
   }
@@ -373,6 +420,9 @@ void web_loop() {
   Serial.print("Outgoing length:"); Serial.println(plen); Serial.print("freemem="); Serial.println(freeRam());
 #endif
   es.ES_www_server_reply(buf,plen);
+  if (do_reboot) {
+    resetFunc();
+  }
 }
 
 void play_sound(uint8_t id) {

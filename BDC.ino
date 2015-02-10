@@ -38,8 +38,8 @@ const prog_char HTTP401UNAUTHORIZED[] PROGMEM = "HTTP/1.0 401 Unauthorized\r\nCo
 const prog_char HTML_HEADER_GENERAL[] PROGMEM = "<html><head><title>Big Display Clock</title></head><body><center><h1>Big Display Clock</h1><br>";
 const prog_char HTML_FOOTER_GENERAL[] PROGMEM = "</center><hr></body></html>";
     
-uint8_t current_hour = 0;
-uint8_t current_min = 0;
+uint8_t current_hour = 255;
+uint8_t current_min = 255;
 uint8_t do_reboot = 0;
 
 // The ethernet shield
@@ -460,6 +460,10 @@ void update_big_display(uint8_t hour, uint8_t min) {
 
 void time_loop() {
   RTC.getTime();
+  if ((RTC.hour == 3) && (RTC.minute == 14) && (RTC.second == 59)) {
+      // Reboot every early morning
+      resetFunc();
+  }
 #ifdef DBGLED
   if (RTC.second % 2) {
     digitalWrite(DBGLED, HIGH);
